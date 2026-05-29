@@ -218,8 +218,26 @@ async def run_sender():
                         await cleanup_webrtc()
                         
                         # Open camera dynamically when receiver joins
-                        print("[WebRTC] Initializing physical webcam camera index 0...")
-                        cap = cv2.VideoCapture(0)
+                        print("[WebRTC] Initializing physical webcam camera...")
+                        cap = None
+                        for camera_idx in [0, 1, 2]:
+                            print(f"[WebRTC] Probing camera index {camera_idx}...")
+                            temp_cap = cv2.VideoCapture(camera_idx)
+                            if temp_cap.isOpened():
+                                # Try reading a frame to verify it actually yields image data
+                                ret, frame = temp_cap.read()
+                                if ret and frame is not None:
+                                    print(f"[WebRTC] Successfully opened camera index {camera_idx} and verified frame ingestion!")
+                                    cap = temp_cap
+                                    break
+                                else:
+                                    print(f"[WebRTC Warning] Camera index {camera_idx} opened but failed to read frames (IR camera or occupied).")
+                                    temp_cap.release()
+                            else:
+                                print(f"[WebRTC Warning] Failed to open camera index {camera_idx}.")
+                        
+                        if cap is None:
+                            print("[WebRTC Error] All physical webcam indices (0, 1, 2) are occupied or failed.")
                         
                         # Create new PeerConnection
                         pc = RTCPeerConnection()
