@@ -45,9 +45,7 @@ export const SOPPanel: React.FC = () => {
             }
 
             const pc = new RTCPeerConnection({
-              iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' }
-              ]
+              iceServers: [] // Empty for instant offline local P2P negotiation (no STUN timeouts)
             });
             pcRef.current = pc;
 
