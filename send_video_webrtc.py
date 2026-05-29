@@ -96,10 +96,11 @@ class WebcamVideoStreamTrack(MediaStreamTrack):
         target_h = int(h * (target_w / w))
         frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
 
-        # Convert OpenCV BGR frame (numpy array) to PyAV VideoFrame
+        # Convert OpenCV BGR frame (numpy array) to PyAV VideoFrame and reformat to YUV420P
         video_frame = VideoFrame.from_ndarray(frame, format="bgr24")
-        video_frame.pts = pts
-        video_frame.time_base = time_base
+        yuv_frame = video_frame.reformat(format="yuv420p")
+        yuv_frame.pts = pts
+        yuv_frame.time_base = time_base
         
         # Increment PTS based on FPS (90000 time base increments per second)
         # 90000 / 30 FPS = 3000 increments per frame
@@ -108,7 +109,7 @@ class WebcamVideoStreamTrack(MediaStreamTrack):
         # Pace the stream to match Target FPS (e.g. 30 FPS -> 33ms sleep)
         await asyncio.sleep(1.0 / self.fps)
         
-        return video_frame
+        return yuv_frame
 
     def _generate_diagnostic_frame(self):
         """
@@ -177,10 +178,15 @@ async def run_sender():
         nonlocal pc, track
         if pc is not None:
             print("[WebRTC] Closing active peer connection...")
-            await pc.close()
+            try:
+                await pc.close()
+            except Exception:
+                pass
             pc = None
         if track is not None:
             track = None
+        # Allow async loops to settle connection states before recreating
+        await asyncio.sleep(0.3)
             
     while True:
         try:
