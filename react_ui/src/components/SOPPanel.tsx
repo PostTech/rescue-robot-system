@@ -5,6 +5,118 @@ import { AlertTriangle, Bell, Flame, Camera, Volume2, Shield } from 'lucide-reac
 export const SOPPanel: React.FC = () => {
   const { victims, events, liveFrame } = useStore();
 
+  const [webrtcActive, setWebrtcActive] = React.useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const pcRef = React.useRef<RTCPeerConnection | null>(null);
+  const wsRef = React.useRef<WebSocket | null>(null);
+
+  React.useEffect(() => {
+    let wsReconnectTimeout: any = null;
+
+    const connectSignaling = () => {
+      console.log("WebRTC: Connecting to signaling at ws://localhost:8080/ws/webrtc?role=receiver");
+      const ws = new WebSocket("ws://localhost:8080/ws/webrtc?role=receiver");
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("WebRTC: Signaling channel open. Dispatching 'ready' to sender...");
+        ws.send(JSON.stringify({ type: "ready" }));
+      };
+
+      ws.onclose = () => {
+        console.warn("WebRTC: Signaling channel closed. Retrying in 4 seconds...");
+        setWebrtcActive(false);
+        wsReconnectTimeout = setTimeout(connectSignaling, 4000);
+      };
+
+      ws.onerror = (err) => {
+        console.error("WebRTC Signaling Error:", err);
+      };
+
+      ws.onmessage = async (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === "offer") {
+            console.log("WebRTC: SDP Offer received from sender. Negotiating E2E connection...");
+            
+            if (pcRef.current) {
+              pcRef.current.close();
+            }
+
+            const pc = new RTCPeerConnection({
+              iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' }
+              ]
+            });
+            pcRef.current = pc;
+
+            pc.oniceconnectionstatechange = () => {
+              console.log("WebRTC ICE Connection State Changed:", pc.iceConnectionState);
+              if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed" || pc.iceConnectionState === "closed") {
+                setWebrtcActive(false);
+              }
+            };
+
+            pc.ontrack = (evt) => {
+              console.log("WebRTC: Received video track!", evt.streams[0]);
+              if (videoRef.current) {
+                videoRef.current.srcObject = evt.streams[0];
+                setWebrtcActive(true);
+              }
+            };
+
+            await pc.setRemoteDescription(new RTCSessionDescription(data));
+            
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            await new Promise<void>((resolve) => {
+              if (pc.iceGatheringState === 'complete') {
+                resolve();
+              } else {
+                const checkState = () => {
+                  if (pc.iceGatheringState === 'complete') {
+                    pc.removeEventListener('icegatheringstatechange', checkState);
+                    resolve();
+                  }
+                };
+                pc.addEventListener('icegatheringstatechange', checkState);
+              }
+            });
+
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: "answer",
+                sdp: pc.localDescription?.sdp
+              }));
+              console.log("WebRTC: SDP Answer successfully sent to sender.");
+            }
+          }
+        } catch (err) {
+          console.error("WebRTC: Failed to handle signaling packet:", err);
+        }
+      };
+    };
+
+    connectSignaling();
+
+    return () => {
+      if (wsReconnectTimeout) clearTimeout(wsReconnectTimeout);
+      if (wsRef.current) {
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          try {
+            wsRef.current.send(JSON.stringify({ type: "bye" }));
+          } catch(e) {}
+        }
+        wsRef.current.close();
+      }
+      if (pcRef.current) {
+        pcRef.current.close();
+      }
+    };
+  }, []);
+
   const getSensorIcon = (type: string) => {
     switch (type) {
       case 'THERMAL':
@@ -49,11 +161,16 @@ export const SOPPanel: React.FC = () => {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="pulse-status" style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: liveFrame ? 'var(--accent-red)' : 'var(--text-muted)' }} />
-            {liveFrame ? 'LIVE FEED (THERMAL)' : 'STREAM STANDBY'}
+            <span className="pulse-status" style={{ 
+              width: '6px', 
+              height: '6px', 
+              borderRadius: '50%', 
+              backgroundColor: webrtcActive ? 'var(--accent-cyan)' : liveFrame ? 'var(--accent-red)' : 'var(--text-muted)' 
+            }} />
+            {webrtcActive ? 'LIVE FEED (WEBRTC H.264)' : liveFrame ? 'LIVE FEED (THERMAL)' : 'STREAM STANDBY'}
           </span>
-          <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: liveFrame ? 'var(--accent-red)' : 'var(--text-muted)' }}>
-            {liveFrame ? '10 FPS' : 'NO SIGNAL'}
+          <span style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: webrtcActive ? 'var(--accent-cyan)' : liveFrame ? 'var(--accent-red)' : 'var(--text-muted)' }}>
+            {webrtcActive ? '30 FPS' : liveFrame ? '10 FPS' : 'NO SIGNAL'}
           </span>
         </div>
         
@@ -68,13 +185,30 @@ export const SOPPanel: React.FC = () => {
           overflow: 'hidden',
           border: '1px solid rgba(255,255,255,0.03)'
         }}>
-          {liveFrame ? (
+          {/* WebRTC Video Stream */}
+          <video 
+            ref={videoRef}
+            autoPlay 
+            playsInline 
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover',
+              display: webrtcActive ? 'block' : 'none'
+            }} 
+          />
+
+          {/* Legacy Base64 Fallback */}
+          {!webrtcActive && liveFrame && (
             <img 
               src={`data:image/jpeg;base64,${liveFrame}`} 
               alt="Thermal Stream" 
               style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
             />
-          ) : (
+          )}
+
+          {/* No Signal display */}
+          {!webrtcActive && !liveFrame && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
               <Camera size={32} strokeWidth={1.5} />
               <span style={{ fontSize: '0.7rem', fontWeight: 500, letterSpacing: '0.5px' }}>WAITING FOR SENSOR INGESTION...</span>

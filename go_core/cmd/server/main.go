@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -130,6 +131,11 @@ func main() {
 	// Live WebSockets telemetry endpoint
 	r.GET("/ws/telemetry", func(c *gin.Context) {
 		handleWebSocket(c.Writer, c.Request)
+	})
+
+	// WebRTC signaling endpoint
+	r.GET("/ws/webrtc", func(c *gin.Context) {
+		handleWebRTCSignaling(c)
 	})
 
 	log.Printf("Control Center Backend starting on port %s...", port)
@@ -349,6 +355,81 @@ func broadcastToWS(data interface{}) {
 			log.Printf("WebSocket writing error: %v", err)
 			conn.Close()
 			delete(clients, conn)
+		}
+	}
+}
+
+var (
+	webrtcSender   *websocket.Conn
+	webrtcReceiver *websocket.Conn
+	webrtcMutex    sync.Mutex
+)
+
+func handleWebRTCSignaling(c *gin.Context) {
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Printf("WebRTC WebSocket upgrade failed: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	role := c.Query("role")
+	if role == "" {
+		role = "receiver"
+	}
+
+	webrtcMutex.Lock()
+	if role == "sender" {
+		if webrtcSender != nil {
+			webrtcSender.Close()
+		}
+		webrtcSender = conn
+		log.Printf("WebRTC Sender connected.")
+	} else {
+		if webrtcReceiver != nil {
+			webrtcReceiver.Close()
+		}
+		webrtcReceiver = conn
+		log.Printf("WebRTC Receiver connected.")
+	}
+	webrtcMutex.Unlock()
+
+	defer func() {
+		webrtcMutex.Lock()
+		if role == "sender" {
+			if webrtcSender == conn {
+				webrtcSender = nil
+				log.Printf("WebRTC Sender disconnected.")
+			}
+		} else {
+			if webrtcReceiver == conn {
+				webrtcReceiver = nil
+				log.Printf("WebRTC Receiver disconnected.")
+			}
+		}
+		webrtcMutex.Unlock()
+	}()
+
+	for {
+		messageType, message, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+
+		webrtcMutex.Lock()
+		var target *websocket.Conn
+		if role == "sender" {
+			target = webrtcReceiver
+		} else {
+			target = webrtcSender
+		}
+		webrtcMutex.Unlock()
+
+		if target != nil {
+			err = target.WriteMessage(messageType, message)
+			if err != nil {
+				log.Printf("Failed to relay WebRTC message: %v", err)
+			}
 		}
 	}
 }
