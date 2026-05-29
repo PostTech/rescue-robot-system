@@ -63,6 +63,7 @@ class WebcamVideoStreamTrack(MediaStreamTrack):
         self.cap = cap
         self.time_base = fractions.Fraction(1, 90000)
         self.pts = 0
+        self.consecutive_failures = 0
         
         # Test if cap is open
         if self.cap is not None and self.cap.isOpened():
@@ -83,8 +84,12 @@ class WebcamVideoStreamTrack(MediaStreamTrack):
         if self.has_camera and self.cap is not None:
             ret, frame = self.cap.read()
             if not ret:
-                print("[Track] Failed to read frame from physical camera. Swapping to diagnostic fallback...")
-                self.has_camera = False
+                self.consecutive_failures += 1
+                if self.consecutive_failures > 30:
+                    print("[Track] Consecutive frame capture failures. Swapping to diagnostic fallback...")
+                    self.has_camera = False
+            else:
+                self.consecutive_failures = 0
 
         if frame is None:
             frame = self._generate_diagnostic_frame()
@@ -167,15 +172,13 @@ async def run_sender():
     print(f"Signaling Relay: {SIGNALING_URL}")
     print("==================================================================")
 
-    # Open physical webcam index 0 in the background
-    cap = cv2.VideoCapture(0)
-    
-    # Store active PeerConnection and track
+    # Store active PeerConnection, track, and camera capture
+    cap = None
     pc = None
     track = None
     
     async def cleanup_webrtc():
-        nonlocal pc, track
+        nonlocal pc, track, cap
         if pc is not None:
             print("[WebRTC] Closing active peer connection...")
             try:
@@ -185,6 +188,13 @@ async def run_sender():
             pc = None
         if track is not None:
             track = None
+        if cap is not None:
+            print("[WebRTC] Releasing physical webcam...")
+            try:
+                cap.release()
+            except Exception:
+                pass
+            cap = None
         # Allow async loops to settle connection states before recreating
         await asyncio.sleep(0.3)
             
@@ -206,6 +216,10 @@ async def run_sender():
                     if msg_type == "ready":
                         print("\n[Signaling] React Control UI joined! Starting new WebRTC E2E stream negotiation...")
                         await cleanup_webrtc()
+                        
+                        # Open camera dynamically when receiver joins
+                        print("[WebRTC] Initializing physical webcam camera index 0...")
+                        cap = cv2.VideoCapture(0)
                         
                         # Create new PeerConnection
                         pc = RTCPeerConnection()
