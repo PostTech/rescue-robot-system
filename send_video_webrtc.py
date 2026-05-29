@@ -99,6 +99,9 @@ class WebcamVideoStreamTrack(MediaStreamTrack):
         h, w = frame.shape[:2]
         target_w = 480
         target_h = int(h * (target_w / w))
+        # Ensure dimensions are even numbers (divisible by 2) for H.264/VP8 compression
+        target_w = (target_w // 2) * 2
+        target_h = (target_h // 2) * 2
         frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_AREA)
 
         # Convert OpenCV BGR frame (numpy array) to PyAV VideoFrame and reformat to YUV420P

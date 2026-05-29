@@ -6,9 +6,17 @@ export const SOPPanel: React.FC = () => {
   const { victims, events, liveFrame } = useStore();
 
   const [webrtcActive, setWebrtcActive] = React.useState(false);
+  const [mediaStream, setMediaStream] = React.useState<MediaStream | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const pcRef = React.useRef<RTCPeerConnection | null>(null);
   const wsRef = React.useRef<WebSocket | null>(null);
+
+  React.useEffect(() => {
+    if (videoRef.current) {
+      console.log("WebRTC: Applying mediaStream to video player.", mediaStream);
+      videoRef.current.srcObject = mediaStream;
+    }
+  }, [mediaStream, webrtcActive]);
 
   React.useEffect(() => {
     let wsReconnectTimeout: any = null;
@@ -26,6 +34,7 @@ export const SOPPanel: React.FC = () => {
       ws.onclose = () => {
         console.warn("WebRTC: Signaling channel closed. Retrying in 4 seconds...");
         setWebrtcActive(false);
+        setMediaStream(null);
         wsReconnectTimeout = setTimeout(connectSignaling, 4000);
       };
 
@@ -53,22 +62,22 @@ export const SOPPanel: React.FC = () => {
               console.log("WebRTC ICE Connection State Changed:", pc.iceConnectionState);
               if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed" || pc.iceConnectionState === "closed") {
                 setWebrtcActive(false);
+                setMediaStream(null);
               }
             };
 
             pc.ontrack = (evt) => {
               console.log("WebRTC: Received video track!", evt.track, evt.streams);
-              if (videoRef.current) {
-                if (evt.streams && evt.streams[0]) {
-                  videoRef.current.srcObject = evt.streams[0];
-                } else {
-                  console.log("WebRTC: Streams array empty, creating custom MediaStream from track.");
-                  const newStream = new MediaStream();
-                  newStream.addTrack(evt.track);
-                  videoRef.current.srcObject = newStream;
-                }
-                setWebrtcActive(true);
+              let stream: MediaStream;
+              if (evt.streams && evt.streams[0]) {
+                stream = evt.streams[0];
+              } else {
+                console.log("WebRTC: Streams array empty, creating custom MediaStream from track.");
+                stream = new MediaStream();
+                stream.addTrack(evt.track);
               }
+              setMediaStream(stream);
+              setWebrtcActive(true);
             };
 
             await pc.setRemoteDescription(new RTCSessionDescription(data));
