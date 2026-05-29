@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rescue Robot Mission Control Panel</title>
+  <!-- Robot Emoji Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+  <div id="dashboard-shell" class="dashboard-shell">
+    
+    <!-- HEADER BAR -->
+    <header class="header-bar">
+      <div class="logo-area">
+        <i data-lucide="shield-alert" class="logo-icon blink-icon"></i>
+        <h1>Rescue Robot <span>Mission Control</span></h1>
+      </div>
+      <div class="system-status-area">
+        <span class="status-label">전체 시스템 상태</span>
+        <div id="safety-level-indicator" class="safety-badge level-normal">NORMAL</div>
+        <p id="safety-text" class="safety-desc">로봇 시스템 연결 정상</p>
+      </div>
+    </header>
+
+    <!-- MAIN BODY GRID -->
+    <main class="control-grid">
+      
+      <!-- COLUMN 1: MISSION PANEL -->
+      <section class="grid-panel panel-left">
+        <div class="panel-header">
+          <i data-lucide="folder-git-2"></i>
+          <h2>임무 기획 및 관리</h2>
+        </div>
+        
+        <!-- Create Mission Form -->
+        <form id="create-mission-form" class="create-mission-form">
+          <div class="form-group">
+            <label for="mission-name-input">임무 이름</label>
+            <input type="text" id="mission-name-input" placeholder="예: 산악 사고 실종자 탐색" required>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="mission-sop-profile">SOP 프로필</label>
+              <select id="mission-sop-profile">
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+            <div class="form-group half">
+              <label for="mission-priority-select">우선순위</label>
+              <select id="mission-priority-select">
+                <option value="NORMAL">보통 (NORMAL)</option>
+                <option value="HIGH" selected>높음 (HIGH)</option>
+                <option value="CRITICAL">긴급 (CRITICAL)</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full">
+            <i data-lucide="plus-circle"></i> 신규 임무 드래프트 생성
+          </button>
+        </form>
+
+        <div class="panel-divider"></div>
+
+        <!-- Missions List Sidebar -->
+        <div class="list-section">
+          <h3>진행 임무 목록</h3>
+          <div id="missions-list-container" class="missions-list-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </section>
+
+      <!-- COLUMN 2: TERRAIN MAP & DETAILS -->
+      <section class="grid-panel panel-center">
+        <div class="panel-header">
+          <i data-lucide="map-pin"></i>
+          <h2>탐색 지도 및 SLAM 텔레메트리</h2>
+        </div>
+
+        <!-- Canvas exploration map -->
+        <div class="canvas-container">
+          <canvas id="terrain-canvas" width="450" height="320"></canvas>
+          <div class="canvas-legend">
+            <span><span class="legend-dot poly"></span>구역 경계</span>
+            <span><span class="legend-dot path"></span>SLAM 탐색 궤적</span>
+            <span><span class="legend-dot slope"></span>급경사 (25°↑)</span>
+            <span><span class="legend-dot rubble"></span>붕괴 장애물</span>
+          </div>
+        </div>
+
+        <!-- Active Mission Details Info -->
+        <div id="active-mission-details" class="active-mission-details">
+          <div class="empty-state">
+            <i data-lucide="info"></i>
+            <p>상세 정보를 보려면 미션을 선택해 주세요.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- COLUMN 3: DETECTION & EVENT LOGS -->
+      <section class="grid-panel panel-right">
+        
+        <!-- Live Video Feed Section -->
+        <div class="video-feed-section">
+          <div class="panel-header">
+            <i data-lucide="video"></i>
+            <h2>로봇 실시간 카메라 피드 (Live Feed)</h2>
+          </div>
+          <div class="video-feed-container">
+            <div id="camera-placeholder" class="camera-placeholder">
+              <i data-lucide="video-off" class="placeholder-icon"></i>
+              <p>실시간 비디오 스트림 대기 중...</p>
+            </div>
+            <img id="live-camera-feed" class="live-camera-feed" style="display: none;" alt="Robot Live Feed">
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+        
+        <!-- Fused Detections Feed -->
+        <div class="detection-section">
+          <div class="panel-header">
+            <i data-lucide="activity"></i>
+            <h2>피해자 탐지 피드 (Sensor Fusion)</h2>
+          </div>
+          <div id="detection-alerts-container" class="detection-alerts-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Global Event timeline -->
+        <div class="timeline-section">
+          <div class="panel-header">
+            <i data-lucide="list-collapse"></i>
+            <h2>시스템 이벤트 타임라인</h2>
+          </div>
+          <div id="event-timeline-container" class="event-timeline-container">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- FOOTER CONTROLS PANEL -->
+    <footer class="footer-control-panel">
+      <div class="footer-left">
+        <h3>임무 수명주기 하달</h3>
+        <p>선택된 미션의 상태를 한 단계씩 승인하여 로봇 탐색 시나리오를 구동합니다.</p>
+      </div>
+      <div class="footer-right">
+        
+        <!-- Simulation Auto-Tick Switch -->
+        <div id="tick-simulator-wrapper" class="tick-simulator-wrapper">
+          <label class="switch-container">
+            <input type="checkbox" id="toggle-auto-tick">
+            <span class="switch-slider"></span>
+          </label>
+          <span class="switch-label"><i data-lucide="cpu"></i> Auto Tick 시뮬레이터</span>
+        </div>
+
+        <!-- Control Action Stepper Buttons -->
+        <div class="btn-group">
+          <button id="btn-approve" class="btn btn-secondary" disabled>
+            <i data-lucide="clipboard-check"></i> 계획 승인 (Approve)
+          </button>
+          <button id="btn-start" class="btn btn-secondary" disabled>
+            <i data-lucide="play-circle"></i> 주행 개시 (Start)
+          </button>
+          <button id="btn-complete" class="btn btn-secondary" disabled>
+            <i data-lucide="check-circle-2"></i> 성공 마감 (Complete)
+          </button>
+          <button id="btn-stop" class="btn btn-danger" disabled>
+            <i data-lucide="octagon"></i> 긴급 정지 (E-STOP)
+          </button>
+        </div>
+
+      </div>
+    </footer>
+
+    <!-- Toast Notifications Area -->
+    <div id="toast-container" class="toast-container"></div>
+
+  </div>
+
+  <!-- API & Core Logic Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/terrain_viz.js"></script>
+  <script src="js/detection_viz.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/websocket.js"></script>
+  <script src="js/demo.js"></script>
+</body>
+</html>

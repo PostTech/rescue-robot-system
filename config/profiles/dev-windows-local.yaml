@@ -1,0 +1,27 @@
+# dev-windows-local 환경 프로파일
+# Windows 기본 개발 환경. ROS Runtime 실행하지 않음.
+
+runtime_profile: dev-windows-local
+
+test_scope:
+  include:
+    - unit
+    - contract
+    - layer
+    - dependency
+    - module_boundary
+    - mission_creation
+    - terrain
+  exclude:
+    - ros_runtime
+    - sensor_hw
+    - field_test
+
+adapters:
+  ros: mock
+  webrtc: mock
+  storage: mock
+  sensor: mock
+  robot_controller: mock
+
+ros_runtime: false

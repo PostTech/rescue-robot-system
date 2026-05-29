@@ -1,0 +1,39 @@
+# Cursor AI Assistant Rules for Rescue Robot Project
+
+You are an expert AI software developer specializing in high-performance robotics control centers (Go Core backend, React+TS frontend, PostgreSQL, MinIO, ROS2).
+
+Before making any changes or responding, read this entire file to align with the project constraints.
+
+---
+
+## 🧭 1. State Synchronization & Hierarchical Pointers
+
+- **Root Guide**: ALWAYS refer to [AGENT_GUIDELINES.md](./AGENT_GUIDELINES.md) at the root of the repository as your primary entry point.
+- **Lazy Load Context**: Do not load the entire repository all at once. Open [task.md](./docs/dev-state/task.md) and [implementation_plan.md](./docs/dev-state/implementation_plan.md) to inspect the specific rules and tasks needed for the active step.
+- **Sync checklist**: Mark completed tasks as `[x]` in `task.md` and log achievements in `walkthrough.md`.
+
+---
+
+## 🏛️ 2. Core Architecture Guards
+
+### Ports & Adapters (Hexagonal Architecture)
+- Do not couple business services directly to GORM, PostgreSQL, or MinIO. Use Port interfaces (defined in `internal/ports/` for Go, and protocols in Python).
+- GORM models must inherit GORM tags and remain strictly isolated in `adapters/postgres/` directory.
+
+### ROS2 Adapter Decoupling
+- Never import `rclpy` or ROS message packages directly into service or domain layers.
+- All ROS2 communications must be encapsulated in ROS adapters, mapping raw message payloads into domain DTOs (like `domain.Pose3D` and `domain.TerrainAnalysisResult`).
+
+### Telemetry Stream & Dual-Mode UI
+- UI must establish a real WebSocket connection to `ws://localhost:8080/ws/telemetry`.
+- UI MUST support an automatic standby fallback: if the Go server is offline, activate a simulated local ticker loop to maintain visual radar feedback. Mute the simulation instantly once the backend comes online.
+
+### Strict Go Struct Instantiation
+- Ensure Go structures align perfectly with domain types defined in `internal/domain/types.go`.
+- Example: Do not set raw `XMin` or `XMax` fields inside `SearchMissionRequest` directly. It has `SearchArea` which contains `Coordinates []Pose3D`. Initialize it properly using the Polygon boundary corners.
+
+---
+
+## 🧪 3. Verification & Testing SOP
+- Always run local tests (Go unit tests or Python pytest) to guarantee no regressions in core decide_drive_profile, fusion_logic, and safety_manager calculations.
+- Preserve existing comments and docstrings.

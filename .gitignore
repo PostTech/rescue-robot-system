@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# mypy
+.mypy_cache/
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# ruff
+.ruff_cache/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Environment
+.env
+.env.local
+
+# Logs (keep structure, ignore runtime logs)
+logs/*.jsonl
+logs/*.log
+
+# Runtime outputs
+outputs/
+
+# Node.js
+react_ui/node_modules/
+react_ui/dist/
+
+# Go binaries
+go_core/server.exe
+go_core/server
+
