@@ -381,12 +381,17 @@ func handleWebRTCSignaling(c *gin.Context) {
 	webrtcMutex.Lock()
 	if role == "sender" {
 		if webrtcSender != nil {
+			log.Printf("WebRTC: Disconnecting duplicate active Sender session.")
 			webrtcSender.Close()
 		}
 		webrtcSender = conn
 		log.Printf("WebRTC Sender connected.")
 	} else {
 		if webrtcReceiver != nil {
+			log.Printf("WebRTC: Disconnecting duplicate active Receiver session (duplicate browser tab detected).")
+			// Send a custom close control frame (4001) to inform the duplicate tab to stay closed
+			msg := websocket.FormatCloseMessage(4001, "Duplicate tab detected")
+			_ = webrtcReceiver.WriteMessage(websocket.CloseMessage, msg)
 			webrtcReceiver.Close()
 		}
 		webrtcReceiver = conn

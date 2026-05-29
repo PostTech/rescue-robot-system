@@ -18,7 +18,7 @@ Start-Sleep -Seconds 4
 # 2. Start Go Core Server
 Write-Output "Starting Go Core Backend..."
 cd go_core
-Start-Process -FilePath ".\server.exe" -NoNewWindow
+Start-Process -FilePath ".\server_webrtc.exe" -NoNewWindow
 cd ..
 
 # 3. Start React UI Dev Server
