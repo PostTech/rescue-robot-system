@@ -59,9 +59,16 @@ export const SOPPanel: React.FC = () => {
             };
 
             pc.ontrack = (evt) => {
-              console.log("WebRTC: Received video track!", evt.streams[0]);
+              console.log("WebRTC: Received video track!", evt.track, evt.streams);
               if (videoRef.current) {
-                videoRef.current.srcObject = evt.streams[0];
+                if (evt.streams && evt.streams[0]) {
+                  videoRef.current.srcObject = evt.streams[0];
+                } else {
+                  console.log("WebRTC: Streams array empty, creating custom MediaStream from track.");
+                  const newStream = new MediaStream();
+                  newStream.addTrack(evt.track);
+                  videoRef.current.srcObject = newStream;
+                }
                 setWebrtcActive(true);
               }
             };
